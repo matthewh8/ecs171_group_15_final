@@ -301,6 +301,7 @@ def extract_insights(results_df, reviews_df):
     
     # Sort by sentiment score
     product_sentiment = product_sentiment.sort_values('score', ascending=False)
+    print(product_sentiment)
     
     # 2. Sentiment trends over time
     insights_df['date'] = pd.to_datetime(insights_df['date'])
@@ -332,16 +333,19 @@ def extract_insights(results_df, reviews_df):
     top_phrases = {}
     for sentiment in ['negative', 'neutral', 'positive']:
         corpus = insights_df[insights_df['predicted_sentiment'] == sentiment]['review'].values
+        if corpus.size == 0:
+            top_phrases[sentiment] = list()
+            continue
         top_phrases[sentiment] = get_top_ngrams(corpus, n=2, top_k=10)
     
     # Print insights
     print("\n===== BUSINESS INSIGHTS =====")
     
     print("\nTop 5 Products by Sentiment Score:")
-    print(product_sentiment[['positive', 'negative', 'neutral', 'score']].head(5))
+    print(product_sentiment[['positive', 'negative', 'score']].head(5))
     
     print("\nBottom 5 Products by Sentiment Score:")
-    print(product_sentiment[['positive', 'negative', 'neutral', 'score']].tail(5))
+    print(product_sentiment[['positive', 'negative', 'score']].tail(5))
     
     print("\nCommon Phrases in Positive Reviews:")
     for phrase, count in top_phrases['positive']:
@@ -350,26 +354,8 @@ def extract_insights(results_df, reviews_df):
     print("\nCommon Phrases in Negative Reviews:")
     for phrase, count in top_phrases['negative']:
         print(f"{phrase}: {count}")
-    
-    # Create visualizations for dashboard
-    # 1. Product sentiment bar chart
-    fig = px.bar(
-        product_sentiment.head(10).reset_index(),
-        x='product_id',
-        y=['positive', 'neutral', 'negative'],
-        title='Top 10 Products by Sentiment',
-        barmode='group'
-    )
-    fig.write_html('product_sentiment.html')
-    
-    # 2. Sentiment trends over time
-    fig = px.line(
-        sentiment_over_time.reset_index(),
-        x='month',
-        y=['positive', 'neutral', 'negative'],
-        title='Sentiment Trends Over Time'
-    )
-    fig.write_html('sentiment_trends.html')
+
+
     
     return product_sentiment, sentiment_over_time, top_phrases
 
@@ -561,7 +547,7 @@ def main():
     test_data_loader = DataLoader(test_dataset, batch_size=16)
     
     # 4. Set up optimizer
-    optimizer = AdamW(model.parameters(), lr=2e-5)
+    optimizer = AdamW(model.parameters(), lr=2e-5,no_deprecation_warning=True)
     
     # 5. Train the model
     train_model(model, train_data_loader, optimizer, device, epochs=4)
