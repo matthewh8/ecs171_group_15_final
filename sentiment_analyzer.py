@@ -355,7 +355,27 @@ def extract_insights(results_df, reviews_df):
     for phrase, count in top_phrases['negative']:
         print(f"{phrase}: {count}")
 
+    # Create visualizations for dashboard
+    # 1. Product sentiment bar chart
+    fig = px.bar(
+        product_sentiment.head(10).reset_index(),
+        x='product_id',
+        y=['positive', 'negative'],
+        title='Top 10 Products by Sentiment',
+        barmode='group'
+    )
+    fig.write_html('product_sentiment.html')
 
+    sentiment_over_time = sentiment_over_time.reset_index()
+    sentiment_over_time['month'] = sentiment_over_time['month'].astype(str)
+    # 2. Sentiment trends over time
+    fig = px.line(
+        sentiment_over_time,
+        x='month',
+        y=['positive', 'negative'],
+        title='Sentiment Trends Over Time'
+    )
+    fig.write_html('sentiment_trends.html')
     
     return product_sentiment, sentiment_over_time, top_phrases
 
