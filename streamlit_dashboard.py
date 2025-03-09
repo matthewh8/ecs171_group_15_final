@@ -29,7 +29,7 @@ def load_model():
     )
     # Load the trained model weights
     try:
-        model.load_state_dict(torch.load('sentiment_model.pt', map_location=device))
+        model.load_state_dict(torch.load('models/sentiment_model.pt', map_location=device))
         model.to(device)
         model.eval()
     except:
@@ -137,7 +137,7 @@ def load_data(file):
     return None
 
 # Extract insights from analyzed reviews
-def extract_insights(df):
+def extract_insights(df, review_col="review"):
     # Ensure we have the right columns
     if 'predicted_sentiment' not in df.columns:
         return None, None, None
@@ -192,7 +192,7 @@ def extract_insights(df):
     top_phrases = {}
     for sentiment in ['negative', 'neutral', 'positive']:
         if sentiment in df['predicted_sentiment'].values:
-            corpus = df[df['predicted_sentiment'] == sentiment]['review'].values
+            corpus = df[df['predicted_sentiment'] == sentiment][review_col].values
             top_phrases[sentiment] = get_top_ngrams(corpus, n=2, top_k=10)
         else:
             top_phrases[sentiment] = []
@@ -231,7 +231,8 @@ def main():
                     "Select the column containing reviews",
                     df.columns
                 )
-                
+                st.session_state['review_col'] = review_col
+
                 optional_cols = st.multiselect(
                     "Select optional columns (product_id, date, etc.)",
                     [col for col in df.columns if col != review_col]
@@ -385,7 +386,12 @@ def main():
         df = st.session_state['analyzed_df']
         
         # Extract insights
-        product_sentiment, sentiment_over_time, top_phrases = extract_insights(df)
+        if 'review_col' in st.session_state:
+            review_col = st.session_state['review_col']
+        else:
+            st.error("Review column not found in session state.")
+            return
+        product_sentiment, sentiment_over_time, top_phrases = extract_insights(df, review_col)
         
         # Dashboard layout
         st.header("Overall Sentiment Distribution")
@@ -433,36 +439,64 @@ def main():
             # Top products by sentiment score
             st.subheader(f"Top {top_n} Products by Sentiment Score")
             top_products = product_sentiment.head(top_n)
-            
+
+            # Reset the index so 'product_id' becomes a column
+            top_products_reset = top_products.reset_index()
+            sentiment_cols = [col for col in ['positive', 'neutral', 'negative'] if col in top_products_reset.columns]
+
+            # Convert from wide to long format
+            melted = top_products_reset.melt(
+                id_vars='product_id',
+                value_vars=sentiment_cols,
+                var_name='sentiment',
+                value_name='count'
+            )
+
+            # Make the grouped bar chart
             fig = px.bar(
-                top_products.reset_index(),
+                melted,
                 x='product_id',
-                y=['positive', 'neutral', 'negative'],
+                y='count',
+                color='sentiment',
+                barmode='group',
                 title=f'Top {top_n} Products by Sentiment Score',
                 color_discrete_map={
                     'positive': 'rgb(72, 199, 142)',
                     'neutral': 'rgb(99, 110, 250)',
                     'negative': 'rgb(239, 85, 59)'
-                },
-                barmode='group'
+                }
             )
             st.plotly_chart(fig)
-            
+
+
             # Bottom products by sentiment score
             st.subheader(f"Bottom {top_n} Products by Sentiment Score")
             bottom_products = product_sentiment.tail(top_n).iloc[::-1]  # Reverse to show worst first
             
+            bottom_products_reset = bottom_products.reset_index()
+            sentiment_cols = [col for col in ['positive', 'neutral', 'negative'] if col in bottom_products_reset.columns]
+
+            # Convert from wide to long
+            melted = bottom_products_reset.melt(
+                id_vars='product_id',
+                value_vars=sentiment_cols,
+                var_name='sentiment',
+                value_name='count'
+            )
+
+            # Make the grouped bar chart
             fig = px.bar(
-                bottom_products.reset_index(),
+                melted,
                 x='product_id',
-                y=['positive', 'neutral', 'negative'],
+                y='count',
+                color='sentiment',
+                barmode='group',
                 title=f'Bottom {top_n} Products by Sentiment Score',
                 color_discrete_map={
                     'positive': 'rgb(72, 199, 142)',
                     'neutral': 'rgb(99, 110, 250)',
                     'negative': 'rgb(239, 85, 59)'
-                },
-                barmode='group'
+                }
             )
             st.plotly_chart(fig)
         
@@ -473,11 +507,21 @@ def main():
             # Convert Period to string for plotting
             sentiment_plot_data = sentiment_over_time.reset_index()
             sentiment_plot_data['month'] = sentiment_plot_data['month'].astype(str)
-            
+
+            sentiment_cols = [col for col in ['positive', 'neutral', 'negative'] if col in sentiment_plot_data.columns]
+            # Reshape the data
+            melted_data = sentiment_plot_data.melt(
+                id_vars='month',
+                value_vars=sentiment_cols,
+                var_name='sentiment',
+                value_name='count'
+            )
+
             fig = px.line(
-                sentiment_plot_data,
+                melted_data,
                 x='month',
-                y=['positive', 'neutral', 'negative'],
+                y='count',
+                color='sentiment',
                 title='Sentiment Trends Over Time',
                 color_discrete_map={
                     'positive': 'rgb(72, 199, 142)',
@@ -491,7 +535,7 @@ def main():
                 legend_title="Sentiment"
             )
             st.plotly_chart(fig)
-            
+
             # Positive ratio trend
             if 'ratio_positive' in sentiment_plot_data.columns:
                 fig = px.line(
