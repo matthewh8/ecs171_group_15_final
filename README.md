@@ -20,16 +20,13 @@ cd ecs171_group_15_final
 
 #### For Windows/Linux:
 ```bash
-# CPU-only version
 pip install torch torchvision
 
-# With CUDA support (replace X.X with your CUDA version, e.g., 11.8)
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cuX.X
 ```
 
 #### For Mac:
 ```bash
-# Mac (including M1/M2/M3)
 pip3 install torch torchvision
 ```
 
